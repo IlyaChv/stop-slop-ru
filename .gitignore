@@ -1,0 +1,8 @@
+__pycache__/
+*.py[cod]
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+# Английский оригинал Stop Slop, форк-референс. В репозиторий не идёт
+stop-slop/
