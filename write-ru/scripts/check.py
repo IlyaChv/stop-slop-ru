@@ -147,6 +147,9 @@ def word_regex(w, single=False):
         return re.escape(w[:-2]) + NOUN_IYA
     if w.endswith(("ый", "ий", "ой")) and n >= 6:
         return re.escape(w[:-2]) + ADJ
+    # Наречие не склоняется: «конечно» не должно ловить «конечном», «крайне» «крайней».
+    if single and w.endswith(("о", "е")):
+        return re.escape(w)
     if single and n >= 6:
         return re.escape(w[: n - 1]) + r"[а-яё]{0,3}"
     if n >= 7:
@@ -160,6 +163,11 @@ def phrase_to_regex(phrase):
     words = re.findall(r"[а-яёa-z-]+", norm(phrase))
     if not words:
         return None
+    # «Конечно!», «Отличный вопрос!»: реплика ассистента, а не слово. Только точная
+    # форма с восклицанием, иначе ловится «есть, конечно» и «в конечном итоге».
+    if phrase.rstrip().endswith("!"):
+        body = r"[\s,]+".join(re.escape(w) for w in words) + r"\s*!"
+        return re.compile(r"(?<![а-яё])" + body, re.I)
     parts = [word_regex(w, single=(len(words) == 1)) for w in words]
     body = r"[\s,]+".join(parts)
     return re.compile(r"(?<![а-яё])" + body + r"(?![а-яё])", re.I)
