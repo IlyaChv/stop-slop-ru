@@ -5,7 +5,8 @@
 Он находит фразы из каталога, считает плотность на тысячу знаков,
 смотрит распределение по абзацам и контрпризнаки. Он не видит
 нанизывание падежей, спрятанного деятеля, ложную субъектность и ритм
-смысла: это остаётся модели.
+смысла: это остаётся модели. Код, ссылки и цитаты Markdown в подсчёт
+не входят: это не текст автора.
 
 Использование:
     python check.py текст.md
@@ -53,7 +54,6 @@ WRITER_SECTION_WEIGHTS = {
     "Заполнители": "Высокий",
     "Значимость без содержания": "Высокий",
     "Меризм": "Высокий",
-    "Штампы": "Высокий",
     "Мета-комментарии": "Средний",
 }
 
@@ -61,18 +61,41 @@ WRITER_SECTION_WEIGHTS = {
 DOMAIN_DISABLE = {
     "full": set(),
     "post": set(),
-    "tech": {"Ритм", "Правило трёх"},
+    "tech": {"Ритм", "Правило трёх", "Композиция"},
     "science": {
         "Пассив и безличные обороты",
         "Отглагольные существительные",
         "Обтекаемые атрибуции",
         "Рассказчик со стороны",
         "Ритм",
+        "Композиция",
     },
-    "legal": {"Пассив и безличные обороты", "Ритм", "Правило трёх"},
+    "legal": {"Пассив и безличные обороты", "Ритм", "Правило трёх", "Композиция"},
 }
 
-PARTICLE_RE = re.compile(r"(?<![а-яё])(же|ведь|вот|ну|уж|разве|ж)(?![а-яё])|[а-яё]+-то(?![а-яё])", re.I)
+PARTICLE_RE = re.compile(r"(?<![а-яё])(же|ведь|вот|ну|уж|разве|ж)(?![а-яё])|(?<![а-яё])[а-яё]+-то(?![а-яё])", re.I)
+# «Кто-то», «где-то», «какой-то»: неопределённые местоимения, а не частица.
+INDEFINITE_TO = {
+    "кто", "кого", "кому", "кем", "ком", "что", "чего", "чему", "чем", "чём",
+    "где", "когда", "куда", "откуда", "почему", "зачем", "отчего", "сколько", "как", "чей",
+}
+INDEFINITE_TO_PREFIXES = ("как", "чь")
+
+# Служебная разметка чат-ботов, утёкшая в текст. Ищется по исходному тексту,
+# до вырезания ссылок: иначе utm_source пропадёт вместе с адресом.
+LEAK_RE = re.compile(
+    r"utm_source=(?:chatgpt\.com|openai|copilot|perplexity|claude\.ai)"
+    r"|oaicite|contentReference\s*\[|grok_card|\bciteturn\d"
+    r"|\bturn\d+(?:search|news|view|file|fetch)\d+"
+    r"|\[cite(?:_start)?(?::\s*[\d, ]+)?\]"
+    r"|【\d+(?::\d+)?†[^】]*】",
+    re.I,
+)
+# Что не проверяем: код, ссылки, цитаты Markdown. Это не текст автора.
+FENCED_RE = re.compile(r"^[ \t]*(```|~~~).*?^[ \t]*\1[^\n]*$", re.M | re.S)
+INLINE_CODE_RE = re.compile(r"`[^`\n]+`")
+URL_RE = re.compile(r"(?:https?://|www\.)[^\s)\]>»]+", re.I)
+BLOCKQUOTE_RE = re.compile(r"^[ \t]*>.*$", re.M)
 NUMBER_RE = re.compile(r"\d+([.,]\d+)?")
 EMOJI_BULLET_RE = re.compile(r"^\s*[\U0001F300-\U0001FAFF☀-➿✅✔▪-◾]")
 BOLD_HEADING_ITEM_RE = re.compile(r"^\s*(?:[-*•]\s*)?\*\*[^*\n]{2,60}[:.]\*\*")
@@ -92,6 +115,20 @@ CONTRAST_PATTERNS = [
 
 def norm(s):
     return s.replace("ё", "е").replace("Ё", "Е").lower()
+
+
+def strip_code(text):
+    return INLINE_CODE_RE.sub("", FENCED_RE.sub("", text))
+
+
+def strip_non_prose(text):
+    """Вырезает код, ссылки и цитаты Markdown. Возвращает текст для подсчёта."""
+    return URL_RE.sub("", BLOCKQUOTE_RE.sub("", strip_code(text)))
+
+
+def find_leaks(text):
+    """Ищет по тексту со ссылками, но без кода: в коде разметку цитируют, а не оставляют."""
+    return [m.group(0) for m in LEAK_RE.finditer(strip_code(text))]
 
 
 NOUN_IYA = r"(ие|ия|ию|ием|ии|ий|иям|иями|иях)"
@@ -269,14 +306,15 @@ def find_structural(text, paras, disabled):
             intro_outro.append(h)
     if title_case:
         out.append(("Высокий", "Типографика", "Заголовки С Больших Букв", title_case[:3], len(title_case)))
-    if intro_outro:
-        out.append(("Высокий", "Композиция", "Разделы «Введение»/«Заключение», проверь по домену", intro_outro, len(intro_outro)))
+    if intro_outro and "Композиция" not in disabled:
+        out.append(("Высокий", "Композиция", "Разделы «Введение»/«Заключение»", intro_outro, len(intro_outro)))
     emoji = [ln.strip()[:40] for ln in lines if EMOJI_BULLET_RE.match(ln)]
     if emoji:
         out.append(("Высокий", "Типографика", "Эмодзи как маркеры списка", emoji[:3], len(emoji)))
+    # Средний вес: так же устроены обычная документация и README.
     bold_items = [ln.strip()[:50] for ln in lines if BOLD_HEADING_ITEM_RE.match(ln)]
     if len(bold_items) >= 3:
-        out.append(("Высокий", "Типографика", "Пункты «**Заголовок:** пояснение» подряд", bold_items[:3], len(bold_items)))
+        out.append(("Средний", "Типографика", "Пункты «**Заголовок:** пояснение» подряд", bold_items[:3], len(bold_items)))
     caps = CAPS_AFTER_COLON_RE.findall(text)
     if len(caps) >= 2:
         out.append(("Высокий", "Типографика", "Прописная после двоеточия (проверь, не имена ли это)", caps[:3], len(caps)))
@@ -300,8 +338,16 @@ def find_structural(text, paras, disabled):
     return out
 
 
+def is_particle(tok):
+    t = norm(tok)
+    if t.endswith("-то"):
+        stem = t[:-3]
+        return stem not in INDEFINITE_TO and not stem.startswith(INDEFINITE_TO_PREFIXES)
+    return True
+
+
 def counter_signals(text):
-    particles = [m.group(0) for m in PARTICLE_RE.finditer(text)]
+    particles = [m.group(0) for m in PARTICLE_RE.finditer(text) if is_particle(m.group(0))]
     numbers = NUMBER_RE.findall(text)
     # Имена: слово с прописной не в начале предложения и не после кавычки.
     names = re.findall(r"(?<![.!?»\n]\s)(?<![.!?»\n])\s([А-ЯЁ][а-яё]{2,})", text)
@@ -313,9 +359,15 @@ def counter_signals(text):
     }
 
 
-def verdict(high, density, even, signals):
-    if high > 0:
-        return "похоже на машину", "есть находки высокого веса"
+def verdict(high, leaks, density, even, signals):
+    if leaks:
+        return "похоже на машину", "в тексте служебная разметка чат-бота"
+    if high >= 2:
+        return "похоже на машину", "две и больше находок высокого веса"
+    if high == 1 and density > 3:
+        return "похоже на машину", "находка высокого веса и плотность выше 3"
+    if high == 1:
+        return "спорно", "одна находка высокого веса при плотности до 3, проверь контекст"
     if density > 6:
         if even and signals["particles"] == 0:
             return "похоже на машину", "плотность выше 6, распределение ровное, частиц нет"
@@ -325,14 +377,19 @@ def verdict(high, density, even, signals):
     return "похоже на человека", "плотность ниже 3, высокого веса нет"
 
 
-def analyze(text, catalog, domain):
+def analyze(raw, catalog, domain):
     disabled = DOMAIN_DISABLE.get(domain, set())
+    leaks = find_leaks(raw)
+    text = strip_non_prose(raw)
     hits, paras = find_lexical(text, catalog, disabled)
     structural = find_structural(text, paras, disabled)
+    if leaks:
+        structural.insert(0, ("Высокий", "Утечка служебной разметки", "Служебная разметка чат-бота", leaks[:3], len(leaks)))
     chars = len(text)
     by_weight = {w: 0 for w in WEIGHTS}
     for h in hits:
         by_weight[h["weight"]] += 1
+    # Структурное правило считается одной находкой, сколько бы строк оно ни поймало.
     for w, _, _, _, n in structural:
         by_weight[w] += 1
     counted = by_weight["Высокий"] + by_weight["Средний"]
@@ -345,14 +402,15 @@ def analyze(text, catalog, domain):
     empty = [i + 1 for i in long_paras if per_para[i] == 0]
     even = bool(long_paras) and not empty
     signals = counter_signals(text)
-    v, why = verdict(by_weight["Высокий"], density, even, signals)
+    v, why = verdict(by_weight["Высокий"], leaks, density, even, signals)
     by_type = {}
     for h in hits:
         by_type[h["type"]] = by_type.get(h["type"], 0) + 1
     for _, t, _, _, n in structural:
-        by_type[t] = by_type.get(t, 0) + n
+        by_type[t] = by_type.get(t, 0) + 1
     return {
         "chars": chars,
+        "excluded_chars": len(raw) - chars,
         "paragraphs": len(paras),
         "domain": domain,
         "by_weight": by_weight,
@@ -375,6 +433,8 @@ def analyze(text, catalog, domain):
 def render(r):
     lines = []
     lines.append(f"Знаков: {r['chars']}   Абзацев: {r['paragraphs']}   Профиль: {r['domain']}")
+    if r["excluded_chars"]:
+        lines.append(f"Исключено из подсчёта: {r['excluded_chars']} знаков (код, ссылки, цитаты)")
     bw = r["by_weight"]
     lines.append(f"Находки: высокий {bw['Высокий']}, средний {bw['Средний']}, низкий {bw['Низкий']}")
     lines.append(f"Лексическая плотность: {r['density']} на 1000 знаков (высокий + средний, без синтаксических находок)")
