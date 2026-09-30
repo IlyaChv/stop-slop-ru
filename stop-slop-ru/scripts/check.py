@@ -117,6 +117,7 @@ PLACEHOLDER_RE = re.compile(
 # Низкий вес, привычки моделей 2026 года: в живых текстах корпуса не встретились,
 # но выборка мала (24 текста на 8 тем).
 NIKAKIH_RE = re.compile(r"(?:^|[.!?]\s+)Никаких\s+[а-яё]+", re.M)
+START_WITH_RE = re.compile(r"Если\s+вы\b[^.!?\n]{0,100},\s*начните\s+с\b", re.I)
 MODEL_HEADING_RE = re.compile(
     r"^\W*(?:что\s+получилось|что\s+мы\s+сделали|с\s+чего\s+вс[её]\s+началось|что\s+это\s+значит\s+для\s+вас)\W*$",
     re.I,
@@ -329,6 +330,35 @@ def is_title_case(line):
     return len(caps) == len(words)
 
 
+CONNECTIVE_RE = re.compile(
+    r"(?<![а-яё])(потому что|поэтому|хотя|так что|а значит|значит|поскольку|чтобы|если|когда|пока|раз|"
+    r"но|однако|зато|котор(?:ый|ая|ое|ые|ого|ой|ому|ую|ым|ыми|ых|ом))(?![а-яё])",
+    re.I,
+)
+
+
+def sentence_stats(text):
+    """Средняя длина фразы, связки на фразу, доля абзацев из одной фразы.
+
+    Считается по прозе: заголовки, пункты списков, таблицы и жирные строки-заголовки
+    не входят. Меньше пяти фраз: статистика не считается."""
+    prose = []
+    for p in split_paragraphs(text):
+        lines = [ln for ln in p.splitlines() if ln.strip() and not re.match(r"^\s*(#|[-*•]\s|\d+[.)]\s|\||\*\*[^*]+\*\*\s*$)", ln)]
+        if lines:
+            prose.append(" ".join(lines))
+    sents = [s for p in prose for s in re.split(r"(?<=[.!?…])\s+", p.strip()) if len(s.split()) >= 2]
+    if len(sents) < 5:
+        return None
+    one = sum(1 for p in prose if len([s for s in re.split(r"(?<=[.!?…])\s+", p.strip()) if s]) == 1)
+    return {
+        "mean_words": round(statistics.mean(len(s.split()) for s in sents), 1),
+        "connectives_per_sentence": round(len(CONNECTIVE_RE.findall(" ".join(sents))) / len(sents), 2),
+        "one_sentence_paragraphs": round(one / len(prose), 2),
+        "sentences": len(sents),
+    }
+
+
 def find_structural(text, paras, disabled):
     out = []
     lines = text.splitlines()
@@ -372,6 +402,9 @@ def find_structural(text, paras, disabled):
     nik = [m.group(0).strip(" .!?") for m in NIKAKIH_RE.finditer(text)]
     if nik:
         out.append(("Низкий", "Привычки моделей 2026", "«Никаких X» в начале фразы", nik[:3], len(nik)))
+    advice = [m.group(0)[:60] for m in START_WITH_RE.finditer(text)]
+    if advice:
+        out.append(("Низкий", "Привычки моделей 2026", "Совет-шаблон «Если вы…, начните с…»", advice[:3], len(advice)))
     if title_case and "Заголовки С Больших Букв" not in disabled:
         out.append(("Высокий", "Типографика", "Заголовки С Больших Букв", title_case[:3], len(title_case)))
     if intro_outro and "Композиция" not in disabled:
@@ -403,6 +436,11 @@ def find_structural(text, paras, disabled):
         plens = [len(p) for p in paras if len(p) > 60]
         if len(plens) >= 3 and statistics.pstdev(plens) / statistics.mean(plens) < 0.2:
             out.append(("Низкий", "Ритм", "Все абзацы почти одного размера", [], len(plens)))
+        # Порог по корпусу 2026-09-30: у живых авторов средняя фраза короче 12 слов
+        # в 4 текстах из 21, у write-ru до правки связок было 0,12 на фразу против 0,29.
+        st = sentence_stats(text)
+        if st and st["mean_words"] < 12 and st["connectives_per_sentence"] < 0.15:
+            out.append(("Низкий", "Ритм", f"Рубленый текст: средняя фраза {st['mean_words']} слова, связок {st['connectives_per_sentence']} на фразу", [], 1))
     return out
 
 
@@ -488,6 +526,7 @@ def analyze(raw, catalog, domain):
         "paragraphs_without_hits": empty,
         "even": even,
         "counter_signals": signals,
+        "sentences": sentence_stats(text),
         "verdict": v,
         "verdict_reason": why,
         "hits": [{k: v2 for k, v2 in h.items() if k != "span"} for h in hits],
@@ -513,6 +552,9 @@ def render(r):
     cs = r["counter_signals"]
     ex = ", ".join(cs["particle_examples"]) if cs["particle_examples"] else "нет"
     lines.append(f"Контрпризнаки: частицы {cs['particles']} ({ex}), числа {cs['numbers']}, слова с прописной внутри фразы {cs['capitalized_mid_sentence']}")
+    ss = r["sentences"]
+    if ss:
+        lines.append(f"Фразы: средняя {ss['mean_words']} слова, связок {ss['connectives_per_sentence']} на фразу, абзацев из одной фразы {round(ss['one_sentence_paragraphs'] * 100)}% (у живых авторов обычно 15–20 слов, 0,3 связки, до 15%)")
     lines.append(f"Предварительный вердикт скрипта: {r['verdict']} ({r['verdict_reason']})")
     if r["by_type"]:
         lines.append("По типам: " + ", ".join(f"{t} {n}" for t, n in r["by_type"].items()))
