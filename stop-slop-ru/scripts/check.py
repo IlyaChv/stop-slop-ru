@@ -557,6 +557,8 @@ def render(r):
     if ss:
         lines.append(f"Фразы: средняя {ss['mean_words']} слова, связок {ss['connectives_per_sentence']} на фразу, абзацев из одной фразы {round(ss['one_sentence_paragraphs'] * 100)}% (у живых авторов обычно 15–20 слов, 0,3 связки, до 15%)")
     lines.append(f"Предварительный вердикт скрипта: {r['verdict']} ({r['verdict_reason']})")
+    if r["chars"] < 1000:
+        lines.append("Текст короче 1000 знаков: плотность неустойчива, одна находка сдвигает её на единицу и больше. Вердикт по плотности считай ориентиром, решают находки высокого веса.")
     if r["by_type"]:
         lines.append("По типам: " + ", ".join(f"{t} {n}" for t, n in r["by_type"].items()))
     lines.append("")
@@ -579,6 +581,39 @@ def render(r):
     return "\n".join(lines)
 
 
+FACT_RES = (
+    ("числа и даты", re.compile(r"\d+(?:[.,:/]\d+)*\s*%?")),
+    ("ссылки", URL_RE),
+    ("названия в кавычках", re.compile(r"«[^«»\n]{1,60}»")),
+    ("слова с прописной внутри фразы", re.compile(r"(?<=[а-яё,;:)]\s)[А-ЯЁA-Z][А-ЯЁа-яёA-Za-z-]{2,}")),
+)
+
+
+def fact_diff(original, edited):
+    """Что из проверяемого пропало или появилось при правке. Порядок не важен, повторы важны."""
+    out = []
+    for label, rx in FACT_RES:
+        a = [norm(x.strip().rstrip(".,;:")) for x in rx.findall(original)]
+        b = [norm(x.strip().rstrip(".,;:")) for x in rx.findall(edited)]
+        lost = [x for x in set(a) if a.count(x) > b.count(x)]
+        added = [x for x in set(b) if b.count(x) > a.count(x)]
+        if lost or added:
+            out.append((label, sorted(lost), sorted(added)))
+    return out
+
+
+def render_diff(diff):
+    if not diff:
+        return "Сверка с исходником: числа, даты, ссылки, названия и имена на месте."
+    lines = ["Сверка с исходником: проверь каждое расхождение, правка не должна терять и добавлять факты."]
+    for label, lost, added in diff:
+        if lost:
+            lines.append(f"  {label}, пропало: " + ", ".join(lost[:10]))
+        if added:
+            lines.append(f"  {label}, появилось: " + ", ".join(added[:10]))
+    return "\n".join(lines)
+
+
 def main():
     try:
         sys.stdout.reconfigure(encoding="utf-8")
@@ -590,6 +625,7 @@ def main():
     ap.add_argument("--domain", default="full", choices=sorted(DOMAIN_DISABLE), help="профиль домена")
     ap.add_argument("--catalog", help="путь к каталогу маркеров (по умолчанию ищется рядом со скриптом)")
     ap.add_argument("--json", action="store_true", help="вывести JSON вместо отчёта")
+    ap.add_argument("--diff", metavar="ИСХОДНИК", help="после правки: сверить числа, даты, ссылки и имена с исходным текстом")
     args = ap.parse_args()
 
     if args.catalog:
@@ -610,10 +646,16 @@ def main():
     result = analyze(text, catalog, args.domain)
     result["catalog"] = str(catalog_path)
     result["catalog_phrases"] = len(catalog)
+    if args.diff:
+        diff = fact_diff(Path(args.diff).read_text(encoding="utf-8-sig"), text)
+        result["fact_diff"] = [{"type": t, "lost": l, "added": a} for t, l, a in diff]
     if args.json:
         print(json.dumps(result, ensure_ascii=False, indent=2))
     else:
         print(render(result))
+        if args.diff:
+            print("")
+            print(render_diff(diff))
 
 
 if __name__ == "__main__":

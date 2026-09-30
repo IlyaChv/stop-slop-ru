@@ -45,8 +45,8 @@ def load_ref(ref, tmp):
     return load(out["stop-slop-ru/scripts/check.py"], out["stop-slop-ru/references/markers.md"], "old")
 
 
-def read_corpus():
-    for f in sorted(TEXTS.glob("*/*.md")):
+def read_corpus(subdir="*"):
+    for f in sorted(TEXTS.glob(f"{subdir}/*.md")):
         raw = f.read_text(encoding="utf-8-sig")
         hdr = re.match(r"<!--(.*?)-->", raw, re.S)
         if not hdr:
@@ -71,6 +71,7 @@ def main():
         pass
     ap = argparse.ArgumentParser()
     ap.add_argument("--old", help="коммит, с которым сравнить")
+    ap.add_argument("--dir", default="*", help="одна папка корпуса: human, machine, holdout, writer")
     args = ap.parse_args()
     if not TEXTS.exists():
         sys.exit("Нет corpus/texts/. Соберите тексты по списку в corpus/README.md.")
@@ -80,7 +81,7 @@ def main():
         if args.old:
             versions = {args.old: load_ref(args.old, tmp), **versions}
         rows = [(name, label, domain, {k: score(v, text, domain) for k, v in versions.items()})
-                for name, label, domain, text in read_corpus()]
+                for name, label, domain, text in read_corpus(args.dir)]
 
     head = "| Файл | Метка | Профиль | " + " | ".join(f"{k}: вердикт | плотность | высокий вес" for k in versions) + " |"
     print(head)
