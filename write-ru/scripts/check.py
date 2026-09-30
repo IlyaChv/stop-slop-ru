@@ -153,9 +153,15 @@ def strip_code(text):
     return INLINE_CODE_RE.sub("", FENCED_RE.sub("", text))
 
 
+_UI_ITEM = r"[«\"]?[А-ЯЁA-Z][А-Яа-яЁёA-Za-z0-9-]*(?:\s[а-яёa-z0-9-]+){0,3}[»\"]?"
+# Путь по интерфейсу: «Настройки → Интеграции → Вебхуки». Надписи повторяют экран,
+# это не текст автора.
+UI_PATH_RE = re.compile(_UI_ITEM + r"(?:\s*(?:→|->)\s*" + _UI_ITEM + r")+")
+
+
 def strip_non_prose(text):
-    """Вырезает код, ссылки и цитаты Markdown. Возвращает текст для подсчёта."""
-    return URL_RE.sub("", BLOCKQUOTE_RE.sub("", strip_code(text)))
+    """Вырезает код, ссылки, цитаты Markdown и пути по интерфейсу. Возвращает текст для подсчёта."""
+    return UI_PATH_RE.sub("", URL_RE.sub("", BLOCKQUOTE_RE.sub("", strip_code(text))))
 
 
 def find_leaks(text):
@@ -542,7 +548,7 @@ def render(r):
     lines = []
     lines.append(f"Знаков: {r['chars']}   Абзацев: {r['paragraphs']}   Профиль: {r['domain']}")
     if r["excluded_chars"]:
-        lines.append(f"Исключено из подсчёта: {r['excluded_chars']} знаков (код, ссылки, цитаты)")
+        lines.append(f"Исключено из подсчёта: {r['excluded_chars']} знаков (код, ссылки, цитаты, пути интерфейса)")
     bw = r["by_weight"]
     lines.append(f"Находки: высокий {bw['Высокий']}, средний {bw['Средний']}, низкий {bw['Низкий']}")
     lines.append(f"Лексическая плотность: {r['density']} на 1000 знаков (высокий + средний, без синтаксических находок)")
@@ -616,6 +622,7 @@ def render_diff(diff):
 
 def main():
     try:
+        sys.stdin.reconfigure(encoding="utf-8")
         sys.stdout.reconfigure(encoding="utf-8")
         sys.stderr.reconfigure(encoding="utf-8")
     except AttributeError:
