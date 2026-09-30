@@ -70,7 +70,8 @@ DOMAIN_DISABLE = {
         "Ритм",
         "Композиция",
     },
-    "legal": {"Пассив и безличные обороты", "Ритм", "Правило трёх", "Композиция"},
+    # В договоре определённые термины пишут с прописной: «Описание Услуг», «Соглашение».
+    "legal": {"Пассив и безличные обороты", "Ритм", "Правило трёх", "Композиция", "Заголовки С Больших Букв"},
 }
 
 PARTICLE_RE = re.compile(r"(?<![а-яё])(же|ведь|вот|ну|уж|разве|ж)(?![а-яё])|(?<![а-яё])[а-яё]+-то(?![а-яё])", re.I)
@@ -91,6 +92,36 @@ LEAK_RE = re.compile(
     r"|【\d+(?::\d+)?†[^】]*】",
     re.I,
 )
+# Обёртка ответа ассистента, если её скопировали вместе с текстом. Замер на
+# корпусе 2026-09-30: у Sonnet 5.5, Opus 5.5 и Fable 5.1 обёртка в 24 текстах
+# из 24, у живых авторов ни разу.
+WRAPPER_OPEN_RE = re.compile(
+    r"^\s*Вот\s+(?:\S+\s+){0,2}?(?:вариант|текст|черновик|пост|статья|статью|письмо|новость|аннотация|аннотацию|"
+    r"раздел|описание|версия|версию|страниц[аы])\b[^\n]{0,150}[.:]\s*$",
+    re.I,
+)
+WRAPPER_OFFER_RE = re.compile(
+    r"(?:Если\s+(?:нужно|надо|хотите|захотите|понадобится)|При\s+необходимости)[^.\n]{0,40}?\bмогу\b"
+    r"[^.\n]{0,60}?\b(?:верси|вариант|текст|тон|объ[её]м|заголов|покороче|подлиннее|английск|сократить|переписать|адаптировать)",
+    re.I,
+)
+WRAPPER_DISCLOSURE_RE = re.compile(
+    r"\b(?:я\s+)?(?:домыслил|додумал|добавил[а]?\s+от\s+себя)|\bзамечани[йя]\s+по\s+тексту\b", re.I
+)
+# Незаполненная заглушка: «[телефон, e-mail]», «[№ ___ от ___]». Пометка [уточнить]
+# у write-ru своя и сюда не входит; ссылки Markdown [текст](...) тоже.
+PLACEHOLDER_RE = re.compile(
+    r"\[(?!уточнить)[^\]\n]{0,40}(?:телефон|e-?mail|почт|адрес|контакт|ФИО|имя|название|дата|ссылк|сумм|№|_{3,})[^\]\n]{0,40}\](?!\()",
+    re.I,
+)
+# Низкий вес, привычки моделей 2026 года: в живых текстах корпуса не встретились,
+# но выборка мала (24 текста на 8 тем).
+NIKAKIH_RE = re.compile(r"(?:^|[.!?]\s+)Никаких\s+[а-яё]+", re.M)
+MODEL_HEADING_RE = re.compile(
+    r"^\W*(?:что\s+получилось|что\s+мы\s+сделали|с\s+чего\s+вс[её]\s+началось|что\s+это\s+значит\s+для\s+вас)\W*$",
+    re.I,
+)
+
 # Что не проверяем: код, ссылки, цитаты Markdown. Это не текст автора.
 FENCED_RE = re.compile(r"^[ \t]*(```|~~~).*?^[ \t]*\1[^\n]*$", re.M | re.S)
 INLINE_CODE_RE = re.compile(r"`[^`\n]+`")
@@ -303,16 +334,45 @@ def find_structural(text, paras, disabled):
     lines = text.splitlines()
     title_case = []
     intro_outro = []
+    model_headings = []
     for ln in lines:
         m = HEADING_RE.match(ln)
         h = m.group(1) if m else (ln.strip() if 0 < len(ln.strip()) < 70 and not ln.strip().endswith((".", ",", ":", ";", "!", "?")) and not ln.strip().startswith(("-", "|", ">", "*")) else "")
         if not h:
-            continue
+            # Жирная строка целиком тоже бывает заголовком: «**Что получилось**».
+            b = re.match(r"^\s*\*\*([^*\n]{2,60})\*\*\s*$", ln)
+            if not b:
+                continue
+            h = b.group(1)
         if is_title_case(h):
             title_case.append(h)
         if re.match(r"^\W*(введение|заключение|итоги|выводы|резюме)\W*$", h, re.I):
             intro_outro.append(h)
-    if title_case:
+        if MODEL_HEADING_RE.match(h):
+            model_headings.append(h)
+    # Обёртка: вступление «Вот вариант…» первой строкой или прямо перед разделителем ---.
+    nonempty = [ln for ln in lines if ln.strip()]
+    opener = [nonempty[0].strip()] if nonempty and WRAPPER_OPEN_RE.match(nonempty[0]) else []
+    for i, ln in enumerate(nonempty[1:], 1):
+        if re.match(r"^\s*(-{3,}|\*{3,}|_{3,})\s*$", ln) and WRAPPER_OPEN_RE.match(nonempty[i - 1]) and nonempty[i - 1].strip() not in opener:
+            opener.append(nonempty[i - 1].strip())
+    if opener:
+        out.append(("Высокий", "Обёртка ответа", "Вступление ассистента перед текстом", [o[:60] for o in opener], len(opener)))
+    offers = [m.group(0) for m in WRAPPER_OFFER_RE.finditer(text)]
+    if offers:
+        out.append(("Высокий", "Обёртка ответа", "Предложение доработать текст", [o[:60] for o in offers[:3]], len(offers)))
+    disclosed = [m.group(0) for m in WRAPPER_DISCLOSURE_RE.finditer(text)]
+    if disclosed:
+        out.append(("Высокий", "Обёртка ответа", "Признание в домысле или замечания к тексту", disclosed[:3], len(disclosed)))
+    holders = PLACEHOLDER_RE.findall(text)
+    if holders:
+        out.append(("Средний", "Заглушки", "Незаполненные заглушки", holders[:3], len(holders)))
+    if model_headings:
+        out.append(("Низкий", "Привычки моделей 2026", "Заголовки-шаблоны", model_headings[:3], len(model_headings)))
+    nik = [m.group(0).strip(" .!?") for m in NIKAKIH_RE.finditer(text)]
+    if nik:
+        out.append(("Низкий", "Привычки моделей 2026", "«Никаких X» в начале фразы", nik[:3], len(nik)))
+    if title_case and "Заголовки С Больших Букв" not in disabled:
         out.append(("Высокий", "Типографика", "Заголовки С Больших Букв", title_case[:3], len(title_case)))
     if intro_outro and "Композиция" not in disabled:
         out.append(("Высокий", "Композиция", "Разделы «Введение»/«Заключение»", intro_outro, len(intro_outro)))
