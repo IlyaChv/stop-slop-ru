@@ -367,14 +367,15 @@ def find_structural(text, paras, disabled):
     model_headings = []
     for ln in lines:
         m = HEADING_RE.match(ln)
-        h = m.group(1) if m else (ln.strip() if 0 < len(ln.strip()) < 70 and not ln.strip().endswith((".", ",", ":", ";", "!", "?")) and not ln.strip().startswith(("-", "|", ">", "*")) else "")
+        # Жирная строка целиком тоже бывает заголовком: «**Что получилось**».
+        b = re.match(r"^\s*\*\*([^*\n]{2,60})\*\*\s*$", ln)
+        marked = m.group(1) if m else (b.group(1) if b else "")
+        h = marked or (ln.strip() if 0 < len(ln.strip()) < 70 and not ln.strip().endswith((".", ",", ":", ";", "!", "?")) and not ln.strip().startswith(("-", "|", ">", "*")) else "")
         if not h:
-            # Жирная строка целиком тоже бывает заголовком: «**Что получилось**».
-            b = re.match(r"^\s*\*\*([^*\n]{2,60})\*\*\s*$", ln)
-            if not b:
-                continue
-            h = b.group(1)
-        if is_title_case(h):
+            continue
+        # Заголовки С Больших Букв ищем только в размеченных заголовках: короткая
+        # строка без точки бывает ФИО адресата, «Виктору Сергеевичу Лаптеву».
+        if marked and is_title_case(h):
             title_case.append(h)
         if re.match(r"^\W*(введение|заключение|итоги|выводы|резюме)\W*$", h, re.I):
             intro_outro.append(h)
