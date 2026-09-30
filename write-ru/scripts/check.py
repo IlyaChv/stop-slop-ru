@@ -61,7 +61,7 @@ WRITER_SECTION_WEIGHTS = {
 DOMAIN_DISABLE = {
     "full": set(),
     "post": set(),
-    "tech": {"Ритм", "Правило трёх", "Композиция"},
+    "tech": {"Ритм", "Правило трёх", "Композиция", "Лексика в заголовках"},
     "science": {
         "Пассив и безличные обороты",
         "Отглагольные существительные",
@@ -328,12 +328,15 @@ def find_lexical(text, catalog, disabled):
 
 
 def is_title_case(line):
-    """Три и больше слов, и каждое с прописной: «Как Мы Работаем». Предлоги тоже считаются."""
-    words = [w for w in re.findall(r"[А-ЯЁа-яёA-Za-z-]+", line) if len(w) >= 2]
-    if len(words) < 3:
-        return False
-    caps = [w for w in words if w[0].isupper()]
-    return len(caps) == len(words)
+    """Три и больше слов, и каждое с прописной: «Как Мы Работаем». Предлоги тоже считаются.
+
+    Аббревиатуры (API, РФ) и капслок не в счёт: «ЦЕНТРАЛЬНАЯ АВТОШКОЛА» это не калька
+    с английского. Заголовок делится по точке: в «Шаг 1. Получите ключ» два предложения."""
+    for part in re.split(r"[.!?:]\s+", line):
+        words = [w for w in re.findall(r"[А-ЯЁа-яёA-Za-z-]+", part) if len(w) >= 2 and not w.isupper()]
+        if len(words) >= 3 and all(w[0].isupper() for w in words):
+            return True
+    return False
 
 
 CONNECTIVE_RE = re.compile(
@@ -425,7 +428,8 @@ def find_structural(text, paras, disabled):
         out.append(("Средний", "Типографика", "Пункты «**Заголовок:** пояснение» подряд", bold_items[:3], len(bold_items)))
     caps = CAPS_AFTER_COLON_RE.findall(text)
     if len(caps) >= 2:
-        out.append(("Высокий", "Типографика", "Прописная после двоеточия (проверь, не имена ли это)", caps[:3], len(caps)))
+        # Низкий вес: на корпусе 2026-09-30 у живых авторов 3 из 35, у машин 2 из 59.
+        out.append(("Низкий", "Типографика", "Прописная после двоеточия (проверь, не имена ли это)", caps[:3], len(caps)))
     for rx, label in CONTRAST_PATTERNS:
         found = re.findall(r"[^.!?\n]{0,30}" + rx + r"[^.!?\n]{0,30}", norm(text), re.I)
         if found:
@@ -494,7 +498,9 @@ def analyze(raw, catalog, domain):
     disabled = DOMAIN_DISABLE.get(domain, set())
     leaks = find_leaks(raw)
     text = strip_non_prose(raw)
-    hits, paras = find_lexical(text, catalog, disabled)
+    # В документации заголовок «Получение токена» это норма жанра, лексику в нём не проверяем.
+    lex_text = re.sub(r"^[ \t]*#{1,6}[ \t]+.*$", "", text, flags=re.M) if "Лексика в заголовках" in disabled else text
+    hits, paras = find_lexical(lex_text, catalog, disabled)
     structural = find_structural(text, paras, disabled)
     if leaks:
         structural.insert(0, ("Высокий", "Утечка служебной разметки", "Служебная разметка чат-бота", leaks[:3], len(leaks)))

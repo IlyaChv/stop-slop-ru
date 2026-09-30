@@ -1,0 +1,273 @@
+{
+  "date": "2026-09-30",
+  "model": "sonnet",
+  "method": "claude -p --max-turns 1 в пустой папке, первый вызов Skill; скиллы из ~/.claude/skills",
+  "correct": 32,
+  "total": 40,
+  "cost_usd": 4.03,
+  "results": [
+    {
+      "id": "r01",
+      "expect": "stop-slop-ru",
+      "got": "stop-slop-ru",
+      "ok": true
+    },
+    {
+      "id": "r02",
+      "expect": "stop-slop-ru",
+      "got": "stop-slop-ru",
+      "ok": true
+    },
+    {
+      "id": "r03",
+      "expect": "stop-slop-ru",
+      "got": "stop-slop-ru",
+      "ok": true
+    },
+    {
+      "id": "r04",
+      "expect": "stop-slop-ru",
+      "got": "stop-slop-ru",
+      "ok": true
+    },
+    {
+      "id": "r05",
+      "expect": "stop-slop-ru",
+      "got": "stop-slop-ru",
+      "ok": true
+    },
+    {
+      "id": "r06",
+      "expect": "stop-slop-ru",
+      "got": "stop-slop-ru",
+      "ok": true
+    },
+    {
+      "id": "r07",
+      "expect": "stop-slop-ru",
+      "got": "none",
+      "ok": false
+    },
+    {
+      "id": "r08",
+      "expect": "stop-slop-ru",
+      "got": "none",
+      "ok": false
+    },
+    {
+      "id": "r09",
+      "expect": "stop-slop-ru",
+      "got": "none",
+      "ok": false
+    },
+    {
+      "id": "r10",
+      "expect": "stop-slop-ru",
+      "got": "none",
+      "ok": false
+    },
+    {
+      "id": "r11",
+      "expect": "stop-slop-ru",
+      "got": "stop-slop-ru",
+      "ok": true
+    },
+    {
+      "id": "r12",
+      "expect": "other:stop-slop",
+      "got": "none",
+      "ok": false
+    },
+    {
+      "id": "r13",
+      "expect": "other:lossless-doc-compress",
+      "got": "lossless-doc-compress",
+      "ok": true
+    },
+    {
+      "id": "r14",
+      "expect": "write-ru",
+      "got": "write-ru",
+      "ok": true
+    },
+    {
+      "id": "r15",
+      "expect": "other:page-cro|cro",
+      "got": "none",
+      "ok": false
+    },
+    {
+      "id": "r16",
+      "expect": "none",
+      "got": "none",
+      "ok": true
+    },
+    {
+      "id": "r17",
+      "expect": "none",
+      "got": "none",
+      "ok": true
+    },
+    {
+      "id": "r18",
+      "expect": "none",
+      "got": "none",
+      "ok": true
+    },
+    {
+      "id": "r19",
+      "expect": "other:stop-slop",
+      "got": "none",
+      "ok": false
+    },
+    {
+      "id": "r20",
+      "expect": "stop-slop-ru",
+      "got": "stop-slop-ru",
+      "ok": true
+    },
+    {
+      "id": "w01",
+      "expect": "write-ru",
+      "got": "write-ru",
+      "ok": true
+    },
+    {
+      "id": "w02",
+      "expect": "write-ru",
+      "got": "write-ru",
+      "ok": true
+    },
+    {
+      "id": "w03",
+      "expect": "write-ru",
+      "got": "write-ru",
+      "ok": true
+    },
+    {
+      "id": "w04",
+      "expect": "write-ru",
+      "got": "write-ru",
+      "ok": true
+    },
+    {
+      "id": "w05",
+      "expect": "write-ru",
+      "got": "write-ru",
+      "ok": true
+    },
+    {
+      "id": "w06",
+      "expect": "write-ru",
+      "got": "write-ru",
+      "ok": true
+    },
+    {
+      "id": "w07",
+      "expect": "write-ru",
+      "got": "write-ru",
+      "ok": true
+    },
+    {
+      "id": "w08",
+      "expect": "write-ru",
+      "got": "write-ru",
+      "ok": true
+    },
+    {
+      "id": "w09",
+      "expect": "write-ru",
+      "got": "write-ru",
+      "ok": true
+    },
+    {
+      "id": "w10",
+      "expect": "write-ru",
+      "got": "write-ru",
+      "ok": true
+    },
+    {
+      "id": "w11",
+      "expect": "write-ru",
+      "got": "write-ru",
+      "ok": true
+    },
+    {
+      "id": "w12",
+      "expect": "write-ru",
+      "got": "write-ru",
+      "ok": true
+    },
+    {
+      "id": "w13",
+      "expect": "other:case-packager",
+      "got": "case-packager",
+      "ok": true
+    },
+    {
+      "id": "w14",
+      "expect": "other:case-packager",
+      "got": "case-packager",
+      "ok": true
+    },
+    {
+      "id": "w15",
+      "expect": "other:seo-aeo-landing-page-writer",
+      "got": "seo-aeo-landing-page-writer",
+      "ok": true
+    },
+    {
+      "id": "w16",
+      "expect": "other:copywriting",
+      "got": "seo-aeo-landing-page-writer",
+      "ok": false
+    },
+    {
+      "id": "w17",
+      "expect": "other:cold-email",
+      "got": "cold-email",
+      "ok": true
+    },
+    {
+      "id": "w18",
+      "expect": "stop-slop-ru",
+      "got": "stop-slop-ru",
+      "ok": true
+    },
+    {
+      "id": "w19",
+      "expect": "none",
+      "got": "none",
+      "ok": true
+    },
+    {
+      "id": "w20",
+      "expect": "other:email-sequence",
+      "got": "email-sequence",
+      "ok": true
+    }
+  ],
+  "repeats": {
+    "note": "r07-r10 повторены ещё 3 раза: частота вызова stop-slop-ru по 4 прогонам",
+    "r07": "3/4",
+    "r08": "1/4",
+    "r09": "3/4",
+    "r10": "0/4",
+    "conclusion": "короткий текст прямо в запросе модель часто правит сама, не вызывая скилл; разброс между прогонами сопоставим с эффектом правки описания"
+  },
+  "history": [
+    {
+      "run": 1,
+      "descriptions": "до правки границ",
+      "correct": 32,
+      "total": 40
+    },
+    {
+      "run": 2,
+      "descriptions": "после правки границ",
+      "correct": 32,
+      "total": 40,
+      "write_ru": "12/12 своих, 5/6 пограничных"
+    }
+  ]
+}

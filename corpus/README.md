@@ -39,6 +39,44 @@ python tools/run_corpus.py --old 799de77
 
 Файлы `writer/before_*` и `writer/after_*` это выход `write-ru` до и после коммита `60a7649` на тех же брифах, с журналами прогона. Скрипт у обеих версий даёт «следов нет».
 
+## Контрольный набор
+
+Папка `texts/holdout/`. На этих текстах правила не подбирались, они проверяют, что правила работают на новых данных.
+
+- `hg_*`: 24 сырых ответа Sonnet 5.5, Opus 5.5 и Fable 5.1 на брифы из [briefs-holdout.md](briefs-holdout.md). Темы другие, чем в `briefs.md`. В половине брифов просьба «только текст».
+- `hh_*`: 16 живых текстов до ноября 2022 года в жанрах, которых не хватало: лендинги, «О нас», деловые письма, документация API, региональные новости.
+
+| Группа | Следов нет | Слабые | Сильные |
+|--------|------------|--------|---------|
+| hg, брифы без запрета комментариев (12) | 1 | 9 | 2 |
+| hg, «только текст» (12) | 10 | 2 | 0 |
+| hh, живые (16) | 14 | 2 | 0 |
+
+Обёртку ответа правила ловят и на новых темах: 11 из 12, пропущена аннотация Opus, которую он написал вовсе без обёртки. Без обёртки скрипт почти слеп: 2 из 12.
+
+**Профиль вёрстки проверен и не принят.** Шесть признаков: жирный от одного раза на тысячу знаков, тире от 1,5, буква «ё», средняя фраза до 14 слов, абзацы из одной фразы от 40%, нет скобок. На обучающих текстах правило «4 из 6» отметило 19 из 24 машинных и 1 из 21 живого. На контрольных 15 из 24 машинных и 3 из 16 живых («О нас» и документация: короткие фразы и абзацы там норма жанра). Каждый шестой живой текст с ложной находкой это слишком много, в каталог профиль не вошёл.
+
+### Источники контрольного набора
+
+| Файл | Метка | Профиль | Дата | Источник | Как проверена дата |
+|------|-------|---------|------|----------|--------------------|
+| hh_about_brenda | human | full | 2020-07-15 | https://web.archive.org/web/20200715165709id_/https://brenda.ru/about | снимок веб-архива 2020-07-15, © 2018 на странице |
+| hh_about_mastersky | human | full | 2021-01-25 | https://web.archive.org/web/20210125140653id_/https://www.mastersky.pro/about/ | снимок веб-архива 2021-01-25 |
+| hh_about_vkusleba | human | full | 2021-12-18 | https://web.archive.org/web/20211218023818id_/https://bakeryvkushleba.ru/ | снимок веб-архива 2021-12-18 |
+| hh_doc_amocrm | human | tech | 2020-12-09 | https://web.archive.org/web/20201209093109id_/https://www.amocrm.ru/developers/content/api/account | снимок веб-архива 2020-12-09, © 2009-2020 на странице |
+| hh_doc_bitrix | human | tech | 2021-01-23 | https://web.archive.org/web/20210123145130id_/https://dev.1c-bitrix.ru/rest_help/ | снимок веб-архива 2021-01-23, © 2001-2021 на странице |
+| hh_doc_ymaps | human | tech | 2020-12-22 | https://web.archive.org/web/20201222004809id_/https://yandex.ru/dev/maps/jsapi/doc/2.1/quick-start/index.html/ | снимок веб-архива 2020-12-22, © 2020 на странице |
+| hh_land_argo | human | full | 2021-01-27 | https://web.archive.org/web/20210127090751id_/https://www.argoclass.ru/ | снимок веб-архива 2021-01-27, лендинг автошколы |
+| hh_land_avtoorel | human | full | 2021-01-21 | https://web.archive.org/web/20210121230017id_/http://avtoshkolaorel.ru/ | снимок веб-архива 2021-01-21, лендинг автошколы |
+| hh_land_beowulf | human | full | 2021-01-19 | https://web.archive.org/web/20210119180955id_/https://beowulf.school/ | снимок веб-архива 2021-01-19, лендинг школы английского (отзывы датированы 2017-2019) |
+| hh_land_lavka | human | full | 2021-01-24 | https://web.archive.org/web/20210124162327id_/http://lavkapekarya.ru/ | снимок веб-архива 2021-01-24, лендинг сети булочных (в тексте новости от декабря 2020) |
+| hh_letter_arenda | human | full | 2020-04-23 | https://vc.ru/legal/122465-shablon-pisma-ob-umenshenii-arendnoi-platy-v-svyazi-s-koronavirusom | datePublished 2020-04-23 на странице vc.ru |
+| hh_letter_buslik | human | full | 2020-03-24 | https://probusiness.io/management/6906-gendirektor-buslik-napisal-partneram-pismo-o-fors-mazhore-posmotrite-vozmozhno-i-vam-pridetsya-eto-sdelat.html | datePublished 2020-03-24 в разметке страницы |
+| hh_letter_tinkov | human | full | 2017-01-20 | https://vc.ru/flood/21435-tinkoff-nocoffee | datePublished 2017-01-20 на странице vc.ru |
+| hh_news_chelkp | human | full | 2022-03-24 | https://www.chel.kp.ru/online/news/4678784/ | article:published_time 2022-03-24 в разметке страницы KP.RU Челябинск |
+| hh_news_ngs | human | full | 2021-04-17 | https://ngs.ru/text/gorod/2021/04/17/69869948/ | datePublished 2021-04-17 в разметке страницы НГС (Новосибирск) |
+| hh_news_perm_topol | human | full | 2019-12-05 | https://59.ru/text/gorod/2019/12/05/66385414/ | datePublished 2019-12-05 в разметке страницы 59.ru (Пермь) |
+
 ## Источники
 
 | Файл | Метка | Профиль | Дата | Источник | Происхождение |
