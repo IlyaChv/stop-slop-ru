@@ -6,3 +6,5 @@ Thumbs.db
 .vscode/
 # Английский оригинал Stop Slop, форк-референс. В репозиторий не идёт
 stop-slop/
+# Тексты корпуса чужие, публиковать их нельзя. В git только corpus/README.md
+corpus/texts/
