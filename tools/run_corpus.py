@@ -20,7 +20,11 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 TEXTS = ROOT / "corpus" / "texts"
-SHORT = {"похоже на машину": "машина", "спорно": "спорно", "похоже на человека": "человек"}
+SHORT = {
+    "сильные следы генерации": "сильные", "слабые следы": "слабые", "следов не найдено": "нет",
+    # Формулировки до 2026-09-30, чтобы работал --old.
+    "похоже на машину": "сильные", "спорно": "слабые", "похоже на человека": "нет",
+}
 
 
 def load(script, catalog, name):
@@ -88,7 +92,7 @@ def main():
     for k in versions:
         for label in ("human", "machine"):
             vs = [res[k][0] for _, lab, _, res in rows if lab == label]
-            counts = ", ".join(f"{v} {vs.count(v)}" for v in ("человек", "спорно", "машина"))
+            counts = ", ".join(f"{v} {vs.count(v)}" for v in ("нет", "слабые", "сильные"))
             print(f"{k}, {label} ({len(vs)}): {counts}")
 
 
